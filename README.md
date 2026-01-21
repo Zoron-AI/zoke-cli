@@ -5,7 +5,7 @@ Convert natural language to shell commands using OpenAI.
 ## Installation
 
 ```bash
-pip install git+https://github.com/YOUR_USERNAME/zoke.git
+pip install git+https://github.com/Zoron-AI/zoke-cli.git
 ```
 
 ## Setup
@@ -25,3 +25,11 @@ zoke "show disk usage sorted by size"
 ```
 
 The tool will display the generated command and ask for confirmation before executing.
+
+### Auto-approve
+
+Use the `-y` flag to skip confirmation and execute immediately:
+
+```bash
+zoke -y "show current date"
+```
