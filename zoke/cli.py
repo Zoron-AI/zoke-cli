@@ -2,11 +2,32 @@
 """zoke - Convert natural language to shell commands using OpenAI."""
 
 import argparse
+import os
 import platform
 import subprocess
 import sys
+import tempfile
+from typing import Optional
 
 from openai import OpenAI, AuthenticationError, RateLimitError, APIConnectionError, APIStatusError
+
+
+def getch() -> str:
+    """Read a single character from stdin without waiting for Enter."""
+    try:
+        import termios
+        import tty
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+    except Exception:
+        # Fallback for Windows or other systems
+        return input()[0] if input() else ""
 
 
 def get_os_info() -> str:
@@ -53,16 +74,54 @@ Rules:
     return response.choices[0].message.content.strip()
 
 
-def confirm_execution(command: str) -> bool:
-    """Ask user to confirm command execution."""
+def edit_command(command: str) -> str:
+    """Allow user to edit the command using bash read -e -i for pre-filled input."""
+    try:
+        # Use bash's read -e -i for pre-filled editable input
+        result = subprocess.run(
+            ["bash", "-c", f'read -e -i {repr(command)} -p "Edit command: " cmd && echo "$cmd"'],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+        else:
+            # Fallback if bash read fails
+            print(f"Current command: {command}")
+            edited = input("Enter new command (or press Enter to keep): ")
+            return edited.strip() if edited.strip() else command
+    except Exception:
+        # Fallback for systems without bash
+        print(f"Current command: {command}")
+        edited = input("Enter new command (or press Enter to keep): ")
+        return edited.strip() if edited.strip() else command
+
+
+def confirm_execution(command: str) -> Optional[str]:
+    """Ask user to confirm, edit, or cancel command execution.
+
+    Returns:
+        The command to execute (original or edited), or None if cancelled.
+    """
     print(f"\nGenerated command:\n  {command}\n")
     while True:
-        response = input("Execute this command? [y/n]: ").strip().lower()
-        if response in ("y", "yes"):
-            return True
-        if response in ("n", "no"):
-            return False
-        print("Please enter 'y' or 'n'")
+        print("Execute? [y]es / [n]o / [e]dit: ", end="", flush=True)
+        response = getch().lower()
+        print(response)  # Echo the character
+
+        if response == "y":
+            return command
+        if response == "n":
+            return None
+        if response == "e":
+            edited_command = edit_command(command)
+            if edited_command:
+                print(f"\nEdited command:\n  {edited_command}\n")
+                return edited_command
+            else:
+                print("Empty command. Cancelled.")
+                return None
+        print("Please press 'y', 'n', or 'e'")
 
 
 def execute_command(command: str) -> int:
@@ -111,12 +170,14 @@ def cmd_run(intent: str, auto_approve: bool = False):
         print(f"Executing: {command}")
         exit_code = execute_command(command)
         sys.exit(exit_code)
-    elif confirm_execution(command):
-        exit_code = execute_command(command)
-        sys.exit(exit_code)
     else:
-        print("Command cancelled.")
-        sys.exit(0)
+        final_command = confirm_execution(command)
+        if final_command:
+            exit_code = execute_command(final_command)
+            sys.exit(exit_code)
+        else:
+            print("Command cancelled.")
+            sys.exit(0)
 
 
 def main():
