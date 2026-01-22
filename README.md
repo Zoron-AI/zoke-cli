@@ -5,6 +5,12 @@ Convert natural language to shell commands using OpenAI.
 ## Installation
 
 ```bash
+pip install zoke-cli
+```
+
+Or install from source:
+
+```bash
 pip install git+https://github.com/Zoron-AI/zoke-cli.git
 ```
 

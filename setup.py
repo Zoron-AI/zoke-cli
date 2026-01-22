@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="zoke",
+    name="zoke-cli",
     version="0.1.0",
     description="Convert natural language to shell commands using OpenAI",
     packages=find_packages(),
